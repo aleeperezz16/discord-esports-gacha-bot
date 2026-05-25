@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(/usr/local/bin/npm install *)",
+      "Bash(/opt/homebrew/bin/npm install *)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/alejo/.nvm/versions/**)",
+      "Read(//Users/alejo/.volta/**)",
+      "Bash(ls ~/.nvm/versions/node/ 2>/dev/null && echo \"nvm found\" || ls ~/.volta/bin/node 2>/dev/null && echo \"volta found\" || find /usr -name \"node\" -type f 2>/dev/null | head -3)",
+      "Read(//usr/**)",
+      "Bash(yarn install *)",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&list=categorymembers&cmtitle=Category:Players&cmlimit=3&format=json\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&titles=S1mple&format=json\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); pages=d['query']['pages']; p=list\\(pages.values\\(\\)\\)[0]; print\\(p['revisions'][0]['slots']['main']['*'][:2000]\\)\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&list=categorymembers&cmtitle=Category:Players&cmlimit=5&cmnamespace=0&format=json\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&titles=S1mple%7CNiKo&format=json\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&list=categorymembers&cmtitle=Category:Players&cmlimit=500&cmnamespace=0&format=json\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&list=categorymembers&cmtitle=Category:Players&cmlimit=10&cmnamespace=0&cmsort=timestamp&cmdir=desc&format=json\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&generator=categorymembers&gcmtitle=Category:Players&gcmlimit=50&gcmnamespace=0&prop=info&format=json\")",
+      "Bash(curl -s --compressed -A \"DiscordEsportsGachaBot/1.0\" \"https://liquipedia.net/counterstrike/api.php?action=query&list=allpages&aplimit=20&apminsize=50000&apnamespace=0&format=json\")"
+    ]
+  }
+}
