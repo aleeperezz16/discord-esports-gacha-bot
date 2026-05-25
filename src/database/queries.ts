@@ -1,18 +1,28 @@
 import pool from './pool';
 import { Player, Rarity } from '../data/players';
-
-const ONE_HOUR = 60 * 60 * 1000;
+import { config } from '../config';
 
 export interface DbPlayer {
-  id: string;
-  name: string;
-  team: string;
-  game: string;
-  role: string;
-  nationality: string;
-  rarity: Rarity;
-  earnings: number;
+  id:             string;
+  name:           string;
+  team:           string;
+  game:           string;
+  role:           string;
+  nationality:    string;
+  rarity:         Rarity;
+  earnings:       number;
   last_synced_at: number;
+}
+
+export interface ClaimedPlayer {
+  player_id:   string;
+  claimed_at:  string;
+  name:        string | null;
+  team:        string | null;
+  game:        string | null;
+  role:        string | null;
+  nationality: string | null;
+  rarity:      Rarity | null;
 }
 
 export const playerRepository = {
@@ -51,7 +61,7 @@ export const playerRepository = {
 
 export const rollRepository = {
   async countRecentRolls(userId: string, guildId: string): Promise<number> {
-    const since = Date.now() - ONE_HOUR;
+    const since = Date.now() - config.rolls.windowMs;
     const { rows } = await pool.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM roll_history WHERE user_id=$1 AND guild_id=$2 AND rolled_at>$3',
       [userId, guildId, since],
@@ -67,18 +77,18 @@ export const rollRepository = {
   },
 
   async getNextResetTime(userId: string, guildId: string): Promise<number> {
-    const since = Date.now() - ONE_HOUR;
+    const since = Date.now() - config.rolls.windowMs;
     const { rows } = await pool.query<{ rolled_at: string }>(
       'SELECT rolled_at FROM roll_history WHERE user_id=$1 AND guild_id=$2 AND rolled_at>$3 ORDER BY rolled_at ASC LIMIT 1',
       [userId, guildId, since],
     );
-    return rows[0] ? Number(rows[0].rolled_at) + ONE_HOUR : Date.now();
+    return rows[0] ? Number(rows[0].rolled_at) + config.rolls.windowMs : Date.now();
   },
 };
 
 export const claimRepository = {
   async countRecentClaims(userId: string, guildId: string): Promise<number> {
-    const since = Date.now() - ONE_HOUR;
+    const since = Date.now() - config.claims.windowMs;
     const { rows } = await pool.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM player_claims WHERE user_id=$1 AND guild_id=$2 AND claimed_at>$3',
       [userId, guildId, since],
@@ -87,12 +97,12 @@ export const claimRepository = {
   },
 
   async getNextClaimResetTime(userId: string, guildId: string): Promise<number> {
-    const since = Date.now() - ONE_HOUR;
+    const since = Date.now() - config.claims.windowMs;
     const { rows } = await pool.query<{ claimed_at: string }>(
       'SELECT claimed_at FROM player_claims WHERE user_id=$1 AND guild_id=$2 AND claimed_at>$3 ORDER BY claimed_at ASC LIMIT 1',
       [userId, guildId, since],
     );
-    return rows[0] ? Number(rows[0].claimed_at) + ONE_HOUR : Date.now();
+    return rows[0] ? Number(rows[0].claimed_at) + config.claims.windowMs : Date.now();
   },
 
   async claimPlayer(playerId: string, guildId: string, userId: string): Promise<boolean> {
@@ -107,14 +117,15 @@ export const claimRepository = {
     }
   },
 
-  async getUserCollection(
-    userId: string,
-    guildId: string,
-  ): Promise<{ player_id: string; claimed_at: string }[]> {
-    const { rows } = await pool.query<{ player_id: string; claimed_at: string }>(
-      'SELECT player_id, claimed_at FROM player_claims WHERE user_id=$1 AND guild_id=$2 ORDER BY claimed_at DESC',
-      [userId, guildId],
-    );
+  async getUserCollection(userId: string, guildId: string): Promise<ClaimedPlayer[]> {
+    const { rows } = await pool.query<ClaimedPlayer>(`
+      SELECT pc.player_id, pc.claimed_at,
+             p.name, p.team, p.game, p.role, p.nationality, p.rarity
+      FROM player_claims pc
+      LEFT JOIN players p ON p.id = pc.player_id
+      WHERE pc.user_id = $1 AND pc.guild_id = $2
+      ORDER BY pc.claimed_at DESC
+    `, [userId, guildId]);
     return rows;
   },
 

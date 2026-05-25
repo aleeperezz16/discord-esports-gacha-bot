@@ -1,19 +1,13 @@
 import { GAME_WIKIS, fetchPlayersForGame } from './liquipedia';
 import { playerRepository } from '../database/queries';
 import { players as hardcodedPlayers } from '../data/players';
-import { Rarity } from '../data/players';
+import { config } from '../config';
 
-const EARNINGS_THRESHOLDS: [number, Rarity][] = [
-  [500_000, 'legendary'],
-  [50_000,  'epic'],
-  [5_000,   'rare'],
-];
-
-function assignRarity(earnings: number): Rarity {
-  for (const [threshold, rarity] of EARNINGS_THRESHOLDS) {
+function assignRarity(earnings: number) {
+  for (const [threshold, rarity] of config.earningsThresholds) {
     if (earnings >= threshold) return rarity;
   }
-  return 'common';
+  return 'common' as const;
 }
 
 async function seedFromHardcoded(): Promise<void> {
@@ -50,7 +44,7 @@ export async function syncFromLiquipedia(): Promise<void> {
   for (const gameName of Object.keys(GAME_WIKIS)) {
     try {
       process.stdout.write(`  ↳ ${gameName}… `);
-      const fetched = await fetchPlayersForGame(gameName);
+      const fetched = await fetchPlayersForGame(gameName, config.sync.maxPlayersPerGame);
 
       for (const p of fetched) {
         await playerRepository.upsertPlayer({
@@ -75,12 +69,10 @@ export async function syncFromLiquipedia(): Promise<void> {
   }
 }
 
-const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
 export function scheduleDailySync(): void {
   setInterval(() => {
     void syncFromLiquipedia().catch(err =>
       console.error('❌ Error en sync automático:', err),
     );
-  }, SYNC_INTERVAL_MS);
+  }, config.sync.intervalMs);
 }

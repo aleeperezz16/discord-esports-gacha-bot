@@ -1,11 +1,5 @@
 import { Player, Rarity } from '../data/players';
-
-const RARITY_WEIGHTS: Record<Rarity, number> = {
-  legendary: 5,
-  epic: 20,
-  rare: 35,
-  common: 40,
-};
+import { config } from '../config';
 
 export function rollPlayer(availablePlayers: Player[]): Player {
   const byRarity: Record<Rarity, Player[]> = {
@@ -15,9 +9,9 @@ export function rollPlayer(availablePlayers: Player[]): Player {
     common:    availablePlayers.filter(p => p.rarity === 'common'),
   };
 
-  const weights = (Object.keys(RARITY_WEIGHTS) as Rarity[]).map(r => ({
+  const weights = (Object.keys(config.rarityWeights) as Rarity[]).map(r => ({
     rarity: r,
-    weight: byRarity[r].length > 0 ? RARITY_WEIGHTS[r] : 0,
+    weight: byRarity[r].length > 0 ? config.rarityWeights[r] : 0,
   }));
 
   const total = weights.reduce((s, w) => s + w.weight, 0);
@@ -33,14 +27,6 @@ export function rollPlayer(availablePlayers: Player[]): Player {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function rarityColor(rarity: Rarity): number {
-  return { legendary: 0xFFD700, epic: 0x9B59B6, rare: 0x3498DB, common: 0x95A5A6 }[rarity];
-}
-
-export function rarityStars(rarity: Rarity): string {
-  return { legendary: '⭐⭐⭐⭐⭐', epic: '⭐⭐⭐⭐', rare: '⭐⭐⭐', common: '⭐⭐' }[rarity];
-}
-
-export function rarityLabel(rarity: Rarity): string {
-  return { legendary: '🟡 Legendario', epic: '🟣 Épico', rare: '🔵 Raro', common: '⚪ Común' }[rarity];
-}
+export function rarityColor(rarity: Rarity): number  { return config.rarityColors[rarity]; }
+export function rarityStars(rarity: Rarity): string  { return config.rarityStars[rarity]; }
+export function rarityLabel(rarity: Rarity): string  { return config.rarityLabels[rarity]; }
