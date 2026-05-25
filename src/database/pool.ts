@@ -56,6 +56,16 @@ export async function initDb(): Promise<void> {
   await pool.query(`
     ALTER TABLE player_claims ALTER COLUMN player_id TYPE VARCHAR(200)
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guild_config (
+      guild_id             VARCHAR(20) PRIMARY KEY,
+      prefix_enabled       BOOLEAN     NOT NULL DEFAULT false,
+      prefix_char          VARCHAR(10) NOT NULL DEFAULT '!',
+      max_rolls_per_hour   INTEGER     NOT NULL DEFAULT 10,
+      max_claims_per_hour  INTEGER     NOT NULL DEFAULT 1
+    )
+  `);
 }
 
 export default pool;

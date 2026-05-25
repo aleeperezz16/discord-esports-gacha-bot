@@ -66,21 +66,11 @@ export const config = {
     maxPlayersPerGame: 100,                  // Máximo de jugadores traídos por juego
   },
 
-  // ── Prefijo personalizado ────────────────────────────────────────────────────
-  // Permite lanzar comandos con un carácter propio (ej: !tirar) además de /tirar.
-  // Requiere habilitar "Message Content Intent" en el Discord Developer Portal.
-  // Variables de entorno: PREFIX_ENABLED=true  PREFIX_CHAR=!
-
-  prefix: {
-    enabled: process.env.PREFIX_ENABLED === 'true',
-    char:    process.env.PREFIX_CHAR ?? '!',
-  },
-
   // ── Nombres y descripciones de comandos ─────────────────────────────────────
   // Cambiar el nombre requiere volver a ejecutar `yarn deploy`.
 
   commands: {
-    roll:       { name: 'tirar',     description: '¡Tira para obtener un jugador de Esports aleatorio!' },
+    roll:       { name: 'roll',     description: '¡Tira para obtener un jugador de Esports aleatorio!' },
     collection: { name: 'coleccion', description: 'Muestra tu colección de jugadores o la de otro usuario.' },
     ranking:    { name: 'ranking',   description: 'Muestra el ranking de coleccionistas del servidor.' },
   },

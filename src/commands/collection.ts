@@ -58,7 +58,7 @@ async function runPaginatedCollection(
 ): Promise<void> {
   if (collection.length === 0) {
     const empty = isOwnCollection
-      ? `📭 Aún no tienes jugadores. ¡Usa \`${config.prefix.enabled ? config.prefix.char : '/'}${config.commands.roll.name}\` para conseguir uno!`
+      ? `📭 Aún no tienes jugadores. ¡Usa \`/${config.commands.roll.name}\` para conseguir uno!`
       : `📭 **${targetDisplayName}** no tiene jugadores en su colección.`;
     await sendInitial(new EmbedBuilder().setDescription(empty).setColor(0x95A5A6));
     return;

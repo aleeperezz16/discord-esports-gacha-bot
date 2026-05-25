@@ -11,7 +11,7 @@ async function buildRankingEmbed(
   const ranking = await claimRepository.getServerRanking(guildId);
 
   if (ranking.length === 0) {
-    return `📭 Nadie ha reclamado jugadores todavía. ¡Usa \`${config.prefix.enabled ? config.prefix.char : '/'}${config.commands.roll.name}\` para empezar!`;
+    return `📭 Nadie ha reclamado jugadores todavía. ¡Usa \`/${config.commands.roll.name}\` para empezar!`;
   }
 
   const lines = await Promise.all(

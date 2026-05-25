@@ -9,6 +9,7 @@ import {
   Message,
 } from 'discord.js';
 import { playerRepository, rollRepository, claimRepository } from '../database/queries';
+import { guildConfigRepository } from '../database/guildConfig';
 import { rollPlayer, rarityColor, rarityStars, rarityLabel } from '../utils/helpers';
 import { config } from '../config';
 import { Player } from '../data/players';
@@ -59,6 +60,7 @@ function attachCollector(
   userId: string,
   guildId: string,
   displayName: string,
+  maxClaims: number,
 ): void {
   const collector = response.createMessageComponentCollector({
     componentType: ComponentType.Button,
@@ -75,10 +77,10 @@ function attachCollector(
     }
 
     const recentClaims = await claimRepository.countRecentClaims(userId, guildId);
-    if (recentClaims >= config.claims.maxPerHour) {
+    if (recentClaims >= maxClaims) {
       const reset = await claimRepository.getNextClaimResetTime(userId, guildId);
       await btn.reply({
-        content: `⏰ Solo puedes reclamar **${config.claims.maxPerHour} jugador por hora**.\nPodrás reclamar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
+        content: `⏰ Solo puedes reclamar **${maxClaims} jugador por hora**.\nPodrás reclamar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
         ephemeral: true,
       });
       return;
@@ -124,14 +126,16 @@ export const data = new SlashCommandBuilder()
   .setDescription(config.commands.roll.description);
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const userId  = interaction.user.id;
-  const guildId = interaction.guildId!;
+  const userId    = interaction.user.id;
+  const guildId   = interaction.guildId!;
+  const guildCfg  = await guildConfigRepository.get(guildId);
+  const maxRolls  = guildCfg.max_rolls_per_hour;
 
   const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
-  if (recentRolls >= config.rolls.maxPerHour) {
+  if (recentRolls >= maxRolls) {
     const reset = await rollRepository.getNextResetTime(userId, guildId);
     await interaction.reply({
-      content: `⏰ Alcanzaste el límite de **${config.rolls.maxPerHour} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
+      content: `⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
       ephemeral: true,
     });
     return;
@@ -147,7 +151,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const player    = rollPlayer(available);
-  const remaining = config.rolls.maxPerHour - recentRolls - 1;
+  const remaining = maxRolls - recentRolls - 1;
 
   await rollRepository.addRoll(userId, guildId);
 
@@ -156,25 +160,28 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     embeds: [buildRollEmbed(
       player,
       `${rarityStars(player.rarity)}  ${player.name}`,
-      `Tiradas restantes esta hora: ${remaining}/${config.rolls.maxPerHour} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
+      `Tiradas restantes esta hora: ${remaining}/${maxRolls} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
     )],
     components: [claimBtn(player.id)],
   });
 
-  attachCollector(response, player, userId, guildId, interaction.user.displayName);
+  attachCollector(response, player, userId, guildId, interaction.user.displayName, guildCfg.max_claims_per_hour);
 }
 
 // ── Prefix command (!tirar) ───────────────────────────────────────────────────
 
 export async function executeFromMessage(message: Message): Promise<void> {
-  const userId  = message.author.id;
-  const guildId = message.guildId;
+  const userId    = message.author.id;
+  const guildId   = message.guildId;
   if (!guildId) return;
 
+  const guildCfg  = await guildConfigRepository.get(guildId);
+  const maxRolls  = guildCfg.max_rolls_per_hour;
+
   const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
-  if (recentRolls >= config.rolls.maxPerHour) {
+  if (recentRolls >= maxRolls) {
     const reset = await rollRepository.getNextResetTime(userId, guildId);
-    await message.reply(`⏰ Alcanzaste el límite de **${config.rolls.maxPerHour} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`);
+    await message.reply(`⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`);
     return;
   }
 
@@ -185,7 +192,7 @@ export async function executeFromMessage(message: Message): Promise<void> {
   }
 
   const player      = rollPlayer(available);
-  const remaining   = config.rolls.maxPerHour - recentRolls - 1;
+  const remaining   = maxRolls - recentRolls - 1;
   const displayName = message.member?.displayName ?? message.author.username;
 
   await rollRepository.addRoll(userId, guildId);
@@ -195,10 +202,10 @@ export async function executeFromMessage(message: Message): Promise<void> {
     embeds: [buildRollEmbed(
       player,
       `${rarityStars(player.rarity)}  ${player.name}`,
-      `Tiradas restantes esta hora: ${remaining}/${config.rolls.maxPerHour} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
+      `Tiradas restantes esta hora: ${remaining}/${maxRolls} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
     )],
     components: [claimBtn(player.id)],
   });
 
-  attachCollector(response, player, userId, guildId, displayName);
+  attachCollector(response, player, userId, guildId, displayName, guildCfg.max_claims_per_hour);
 }

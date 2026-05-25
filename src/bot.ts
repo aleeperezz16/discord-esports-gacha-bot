@@ -3,26 +3,36 @@ import { ExtendedClient, Command } from './types';
 import * as roll       from './commands/roll';
 import * as collection from './commands/collection';
 import * as ranking    from './commands/ranking';
+import * as configurar from './commands/configurar';
+import { guildConfigRepository } from './database/guildConfig';
 import { config } from './config';
 
 const COMMANDS: Command[] = [
   { data: roll.data,       execute: roll.execute },
   { data: collection.data, execute: collection.execute },
   { data: ranking.data,    execute: ranking.execute },
+  { data: configurar.data, execute: configurar.execute },
 ];
 
+const PREFIX_COMMANDS: Record<string, (msg: Parameters<typeof roll.executeFromMessage>[0]) => Promise<void>> = {
+  [config.commands.roll.name]:       roll.executeFromMessage,
+  [config.commands.collection.name]: collection.executeFromMessage,
+  [config.commands.ranking.name]:    ranking.executeFromMessage,
+};
+
 export function createBot(): ExtendedClient {
-  const intents = [GatewayIntentBits.Guilds];
+  // GuildMessages + MessageContent are always requested so per-guild prefix works
+  // without a restart. MessageContent is a privileged intent — enable it once in
+  // Discord Developer Portal → Bot → Privileged Gateway Intents.
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
+  }) as ExtendedClient;
 
-  // MessageContent is a privileged intent — only enable it when prefix is active.
-  // Requires "Message Content Intent" toggled ON in Discord Developer Portal → Bot.
-  if (config.prefix.enabled) {
-    intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
-  }
-
-  const client = new Client({ intents }) as ExtendedClient;
   client.commands = new Collection<string, Command>();
-
   for (const cmd of COMMANDS) {
     client.commands.set(cmd.data.name, cmd);
   }
@@ -30,8 +40,7 @@ export function createBot(): ExtendedClient {
   // ── Ready ──────────────────────────────────────────────────────────────────
 
   client.once(Events.ClientReady, c => {
-    const prefixInfo = config.prefix.enabled ? ` · Prefijo: "${config.prefix.char}"` : '';
-    console.log(`✅ Bot listo como ${c.user.tag} — ${c.guilds.cache.size} servidor(es)${prefixInfo}`);
+    console.log(`✅ Bot listo como ${c.user.tag} — ${c.guilds.cache.size} servidor(es)`);
   });
 
   // ── Slash commands ─────────────────────────────────────────────────────────
@@ -57,36 +66,31 @@ export function createBot(): ExtendedClient {
 
   // ── Prefix commands ────────────────────────────────────────────────────────
 
-  if (config.prefix.enabled) {
-    const PREFIX_COMMANDS: Record<string, (msg: Parameters<typeof roll.executeFromMessage>[0]) => Promise<void>> = {
-      [config.commands.roll.name]:       roll.executeFromMessage,
-      [config.commands.collection.name]: collection.executeFromMessage,
-      [config.commands.ranking.name]:    ranking.executeFromMessage,
-    };
+  client.on(Events.MessageCreate, async message => {
+    if (message.author.bot || !message.guildId) return;
 
-    client.on(Events.MessageCreate, async message => {
-      if (message.author.bot) return;
-      if (!message.content.startsWith(config.prefix.char)) return;
+    const guildCfg = await guildConfigRepository.get(message.guildId);
+    if (!guildCfg.prefix_enabled) return;
+    if (!message.content.startsWith(guildCfg.prefix_char)) return;
 
-      const commandName = message.content
-        .slice(config.prefix.char.length)
-        .trim()
-        .split(/\s+/)[0]
-        ?.toLowerCase();
+    const commandName = message.content
+      .slice(guildCfg.prefix_char.length)
+      .trim()
+      .split(/\s+/)[0]
+      ?.toLowerCase();
 
-      if (!commandName) return;
+    if (!commandName) return;
 
-      const handler = PREFIX_COMMANDS[commandName];
-      if (!handler) return;
+    const handler = PREFIX_COMMANDS[commandName];
+    if (!handler) return;
 
-      try {
-        await handler(message);
-      } catch (err) {
-        console.error(`Error en ${config.prefix.char}${commandName}:`, err);
-        await message.reply('❌ Ocurrió un error al ejecutar este comando.').catch(() => undefined);
-      }
-    });
-  }
+    try {
+      await handler(message);
+    } catch (err) {
+      console.error(`Error en ${guildCfg.prefix_char}${commandName}:`, err);
+      await message.reply('❌ Ocurrió un error al ejecutar este comando.').catch(() => undefined);
+    }
+  });
 
   return client;
 }
