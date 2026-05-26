@@ -10,25 +10,62 @@ import {
 } from 'discord.js';
 import { playerRepository, rollRepository, claimRepository } from '../database/queries';
 import { guildConfigRepository } from '../database/guildConfig';
-import { rollPlayer, rarityColor, rarityStars, rarityLabel } from '../utils/helpers';
+import { rollPlayer, rarityColor } from '../utils/helpers';
 import { config } from '../config';
 import { Player } from '../data/players';
 
+// Prevents concurrent double-rolls from the same user in the same guild.
+const pendingRolls = new Set<string>();
+
 // ── Shared UI builders ────────────────────────────────────────────────────────
 
-function buildRollEmbed(player: Player, title: string, footer: string): EmbedBuilder {
-  return new EmbedBuilder()
+function buildRollEmbed(player: Player, remaining: number): EmbedBuilder {
+  const footerText = remaining <= 0
+    ? '⚠️ SIN TIRADAS RESTANTES ⚠️'
+    : `⚠️ ${remaining} ROLL${remaining === 1 ? '' : 'S'} RESTANTE${remaining === 1 ? '' : 'S'} ⚠️`;
+
+  const embed = new EmbedBuilder()
     .setColor(rarityColor(player.rarity))
-    .setTitle(title)
+    .setTitle(player.name)
+    .setDescription(`${player.team} · ${player.game}`)
     .addFields(
-      { name: '🎮 Juego',        value: player.game,                inline: true },
-      { name: '🏆 Equipo',       value: player.team,                inline: true },
-      { name: '⚔️ Rol',          value: player.role,                inline: true },
-      { name: '🌍 Nacionalidad', value: player.nationality,         inline: true },
-      { name: '✨ Rareza',       value: rarityLabel(player.rarity), inline: true },
+      { name: 'Nacionalidad', value: player.nationality || 'Desconocida', inline: true },
+      { name: 'Rol',          value: player.role        || 'Pro Player',  inline: true },
     )
-    .setFooter({ text: footer })
-    .setTimestamp();
+    .setFooter({ text: footerText });
+
+  if (player.image_url) embed.setImage(player.image_url);
+  return embed;
+}
+
+function buildClaimedEmbed(player: Player, claimerTag: string): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(rarityColor(player.rarity))
+    .setTitle(player.name)
+    .setDescription(`${player.team} · ${player.game}`)
+    .addFields(
+      { name: 'Nacionalidad', value: player.nationality || 'Desconocida', inline: true },
+      { name: 'Rol',          value: player.role        || 'Pro Player',  inline: true },
+    )
+    .setFooter({ text: `¡Reclamado por ${claimerTag}! 🎉` });
+
+  if (player.image_url) embed.setImage(player.image_url);
+  return embed;
+}
+
+function buildExpiredEmbed(player: Player): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(0x808080)
+    .setTitle(player.name)
+    .setDescription(`${player.team} · ${player.game}`)
+    .addFields(
+      { name: 'Nacionalidad', value: player.nationality || 'Desconocida', inline: true },
+      { name: 'Rol',          value: player.role        || 'Pro Player',  inline: true },
+    )
+    .setFooter({ text: '⌛ Tirada expirada — nadie reclamó a tiempo.' });
+
+  if (player.image_url) embed.setImage(player.image_url);
+  return embed;
 }
 
 function claimBtn(playerId: string): ActionRowBuilder<ButtonBuilder> {
@@ -93,28 +130,16 @@ function attachCollector(
     }
 
     collector.stop('claimed');
-
-    const claimedEmbed = buildRollEmbed(
-      player,
-      `${rarityStars(player.rarity)}  ${player.name} — ¡Reclamado! 🎉`,
-      `Reclamado por ${btn.user.tag}`,
-    ).setDescription(`**${btn.user.displayName}** añadió a **${player.name}** a su colección.`);
-
-    await btn.update({ embeds: [claimedEmbed], components: [disabledBtn(player.id, '¡Reclamado!', '✅')] });
+    await btn.update({
+      embeds:     [buildClaimedEmbed(player, btn.user.tag)],
+      components: [disabledBtn(player.id, '¡Reclamado!', '✅')],
+    });
   });
 
   collector.on('end', async (_, reason) => {
     if (reason === 'claimed') return;
-
-    const expiredEmbed = new EmbedBuilder()
-      .setColor(0x808080)
-      .setTitle(`⌛ Tirada expirada — ${player.name}`)
-      .setDescription('Nadie reclamó este jugador a tiempo.')
-      .setTimestamp();
-
-    // response.edit exists on both InteractionResponse and Message
     await (response as unknown as { edit: (d: unknown) => Promise<unknown> })
-      .edit({ embeds: [expiredEmbed], components: [disabledBtn(player.id, 'Expirado', '⌛')] })
+      .edit({ embeds: [buildExpiredEmbed(player)], components: [disabledBtn(player.id, 'Expirado', '⌛')] })
       .catch(() => undefined);
   });
 }
@@ -126,86 +151,93 @@ export const data = new SlashCommandBuilder()
   .setDescription(config.commands.roll.description);
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const userId    = interaction.user.id;
-  const guildId   = interaction.guildId!;
-  const guildCfg  = await guildConfigRepository.get(guildId);
-  const maxRolls  = guildCfg.max_rolls_per_hour;
+  const userId  = interaction.user.id;
+  const guildId = interaction.guildId!;
+  const key     = `${userId}:${guildId}`;
 
-  const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
-  if (recentRolls >= maxRolls) {
-    const reset = await rollRepository.getNextResetTime(userId, guildId);
-    await interaction.reply({
-      content: `⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
-      ephemeral: true,
-    });
+  if (pendingRolls.has(key)) {
+    await interaction.reply({ content: '⏳ Ya tienes una tirada en progreso.', ephemeral: true });
     return;
   }
+  pendingRolls.add(key);
 
-  const available = await playerRepository.getAvailablePlayers(guildId);
-  if (available.length === 0) {
-    await interaction.reply({
-      content: '🏆 ¡Todos los jugadores ya han sido reclamados en este servidor!',
-      ephemeral: true,
+  try {
+    const guildCfg    = await guildConfigRepository.get(guildId);
+    const maxRolls    = guildCfg.max_rolls_per_hour;
+    const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
+
+    if (recentRolls >= maxRolls) {
+      const reset = await rollRepository.getNextResetTime(userId, guildId);
+      await interaction.reply({
+        content: `⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const available = await playerRepository.getAvailablePlayers(guildId);
+    if (available.length === 0) {
+      await interaction.reply({ content: '🏆 ¡Todos los jugadores ya han sido reclamados en este servidor!', ephemeral: true });
+      return;
+    }
+
+    const player    = rollPlayer(available);
+    const remaining = maxRolls - recentRolls - 1;
+
+    await rollRepository.addRoll(userId, guildId);
+
+    const response = await interaction.reply({
+      embeds:     [buildRollEmbed(player, remaining)],
+      components: [claimBtn(player.id)],
     });
-    return;
+
+    attachCollector(response, player, userId, guildId, interaction.user.displayName, guildCfg.max_claims_per_hour);
+  } finally {
+    pendingRolls.delete(key);
   }
-
-  const player    = rollPlayer(available);
-  const remaining = maxRolls - recentRolls - 1;
-
-  await rollRepository.addRoll(userId, guildId);
-
-  const response = await interaction.reply({
-    content: `🎲 **${interaction.user.displayName}** realizó una tirada…`,
-    embeds: [buildRollEmbed(
-      player,
-      `${rarityStars(player.rarity)}  ${player.name}`,
-      `Tiradas restantes esta hora: ${remaining}/${maxRolls} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
-    )],
-    components: [claimBtn(player.id)],
-  });
-
-  attachCollector(response, player, userId, guildId, interaction.user.displayName, guildCfg.max_claims_per_hour);
 }
 
-// ── Prefix command (!tirar) ───────────────────────────────────────────────────
+// ── Prefix command (!roll) ────────────────────────────────────────────────────
 
 export async function executeFromMessage(message: Message): Promise<void> {
-  const userId    = message.author.id;
-  const guildId   = message.guildId;
+  const userId  = message.author.id;
+  const guildId = message.guildId;
   if (!guildId) return;
 
-  const guildCfg  = await guildConfigRepository.get(guildId);
-  const maxRolls  = guildCfg.max_rolls_per_hour;
+  const key = `${userId}:${guildId}`;
+  if (pendingRolls.has(key)) return;
+  pendingRolls.add(key);
 
-  const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
-  if (recentRolls >= maxRolls) {
-    const reset = await rollRepository.getNextResetTime(userId, guildId);
-    await message.reply(`⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`);
-    return;
+  try {
+    const guildCfg    = await guildConfigRepository.get(guildId);
+    const maxRolls    = guildCfg.max_rolls_per_hour;
+    const recentRolls = await rollRepository.countRecentRolls(userId, guildId);
+
+    if (recentRolls >= maxRolls) {
+      const reset = await rollRepository.getNextResetTime(userId, guildId);
+      await message.reply(`⏰ Alcanzaste el límite de **${maxRolls} tiradas por hora**.\nPodrás tirar de nuevo <t:${Math.floor(reset / 1000)}:R>.`);
+      return;
+    }
+
+    const available = await playerRepository.getAvailablePlayers(guildId);
+    if (available.length === 0) {
+      await message.reply('🏆 ¡Todos los jugadores ya han sido reclamados en este servidor!');
+      return;
+    }
+
+    const player      = rollPlayer(available);
+    const remaining   = maxRolls - recentRolls - 1;
+    const displayName = message.member?.displayName ?? message.author.username;
+
+    await rollRepository.addRoll(userId, guildId);
+
+    const response = await message.reply({
+      embeds:     [buildRollEmbed(player, remaining)],
+      components: [claimBtn(player.id)],
+    });
+
+    attachCollector(response, player, userId, guildId, displayName, guildCfg.max_claims_per_hour);
+  } finally {
+    pendingRolls.delete(key);
   }
-
-  const available = await playerRepository.getAvailablePlayers(guildId);
-  if (available.length === 0) {
-    await message.reply('🏆 ¡Todos los jugadores ya han sido reclamados en este servidor!');
-    return;
-  }
-
-  const player      = rollPlayer(available);
-  const remaining   = maxRolls - recentRolls - 1;
-  const displayName = message.member?.displayName ?? message.author.username;
-
-  await rollRepository.addRoll(userId, guildId);
-
-  const response = await message.reply({
-    content: `🎲 **${displayName}** realizó una tirada…`,
-    embeds: [buildRollEmbed(
-      player,
-      `${rarityStars(player.rarity)}  ${player.name}`,
-      `Tiradas restantes esta hora: ${remaining}/${maxRolls} · Expira en ${config.rolls.claimWindowMs / 1000}s`,
-    )],
-    components: [claimBtn(player.id)],
-  });
-
-  attachCollector(response, player, userId, guildId, displayName, guildCfg.max_claims_per_hour);
 }

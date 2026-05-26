@@ -9,9 +9,7 @@ import {
   Message,
 } from 'discord.js';
 import { playerRepository, GuildPlayer } from '../database/queries';
-import { rarityLabel, rarityStars } from '../utils/helpers';
 import { config } from '../config';
-import { Rarity } from '../data/players';
 
 const GAME_CHOICES = [
   { name: 'CS2',               value: 'CS2' },
@@ -30,18 +28,15 @@ function buildListEmbed(
   total:   number,
   filter:  string | null,
 ): EmbedBuilder {
-  const pageSize = config.collection.pageSize;
+  const pageSize = config.list.pageSize;
   const start    = page * pageSize;
   const slice    = players.slice(start, start + pageSize);
 
   const desc = slice.map((p, i) => {
-    const rarity = p.rarity as Rarity;
-    const status = p.claimed_by ? `<@${p.claimed_by}>` : '✅ Disponible';
-    return (
-      `**${start + i + 1}.** ${rarityStars(rarity)} **${p.name}** — ${p.game}\n` +
-      `└ ${p.team} · ${rarityLabel(rarity)} · ${status}`
-    );
-  }).join('\n\n');
+    const num   = start + i + 1;
+    const claim = p.claimed_by ? ` — <@${p.claimed_by}>` : '';
+    return `**#${num}** — **${p.name}** — ${p.team} · ${p.game}${claim}`;
+  }).join('\n');
 
   const title = filter ? `📋 Jugadores — ${filter}` : '📋 Todos los jugadores';
 
@@ -72,7 +67,7 @@ async function runPaginatedList(
     return;
   }
 
-  const totalPages = Math.ceil(players.length / config.collection.pageSize);
+  const totalPages = Math.ceil(players.length / config.list.pageSize);
   let page = 0;
 
   const response = totalPages === 1

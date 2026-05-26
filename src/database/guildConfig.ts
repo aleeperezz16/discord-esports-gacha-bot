@@ -15,7 +15,7 @@ const cache = new Map<string, GuildConfig>();
 function defaults(guildId: string): GuildConfig {
   return {
     guild_id:            guildId,
-    prefix_enabled:      false,
+    prefix_enabled:      true,
     prefix_char:         '!',
     max_rolls_per_hour:  config.rolls.maxPerHour,
     max_claims_per_hour: config.claims.maxPerHour,

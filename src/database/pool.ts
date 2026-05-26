@@ -46,8 +46,13 @@ export async function initDb(): Promise<void> {
       nationality    VARCHAR(100) NOT NULL DEFAULT 'Unknown',
       rarity         VARCHAR(20)  NOT NULL DEFAULT 'common',
       earnings       INTEGER      NOT NULL DEFAULT 0,
+      image_url      TEXT,
       last_synced_at BIGINT       NOT NULL
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS image_url TEXT
   `);
 
   await pool.query(`

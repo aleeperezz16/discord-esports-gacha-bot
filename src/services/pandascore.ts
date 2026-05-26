@@ -31,6 +31,7 @@ interface PandaPlayer {
   name:          string;
   nationality?:  string;
   role?:         string | null;
+  image_url?:    string | null;
   current_team?: { name: string } | null;
 }
 
@@ -42,6 +43,7 @@ export interface FetchedPlayer {
   role:        string;
   nationality: string;
   earnings:    number;
+  image_url:   string;
 }
 
 function pickRole(gameName: string, handle: string, fromApi?: string | null): string {
@@ -93,7 +95,8 @@ export async function fetchPlayersForGame(gameName: string, maxPlayers = 100): P
         game:        gameName,
         role:        pickRole(gameName, p.name, p.role),
         nationality: p.nationality ?? 'Unknown',
-        earnings:    0, // PandaScore doesn't expose earnings data
+        earnings:    0,
+        image_url:   p.image_url ?? '',
       });
     }
 

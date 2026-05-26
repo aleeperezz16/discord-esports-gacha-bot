@@ -21,6 +21,10 @@ export const config = {
     paginationTimeoutMs: 120_000, // Tiempo que los botones de paginación permanecen activos (ms)
   },
 
+  list: {
+    pageSize: 15, // Jugadores por página en el comando lista
+  },
+
   // ── Rareza ───────────────────────────────────────────────────────────────────
 
   rarityWeights: {
@@ -63,7 +67,7 @@ export const config = {
 
   sync: {
     intervalMs:        24 * 60 * 60 * 1000, // Intervalo entre sincronizaciones automáticas (ms)
-    maxPlayersPerGame: 100,                  // Máximo de jugadores traídos por juego
+    maxPlayersPerGame: 500,                  // Máximo de jugadores traídos por juego
   },
 
   // ── Nombres y descripciones de comandos ─────────────────────────────────────
@@ -74,5 +78,6 @@ export const config = {
     collection: { name: 'coleccion', description: 'Muestra tu colección de jugadores o la de otro usuario.' },
     ranking:    { name: 'ranking',   description: 'Muestra el ranking de coleccionistas del servidor.' },
     lista:      { name: 'lista',     description: 'Lista todos los jugadores disponibles en el servidor.' },
+    admin:      { name: 'admin',     description: '[DEV] Comandos de mantenimiento de la base de datos.' },
   },
 };

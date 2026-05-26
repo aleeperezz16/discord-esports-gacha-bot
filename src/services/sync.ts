@@ -33,6 +33,7 @@ async function seedFromHardcoded(): Promise<void> {
       nationality:    p.nationality,
       rarity:         p.rarity,
       earnings:       0,
+      image_url:      '',
       last_synced_at: Date.now(),
     });
   }

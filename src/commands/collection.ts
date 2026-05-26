@@ -10,7 +10,7 @@ import {
   Message,
 } from 'discord.js';
 import { claimRepository, ClaimedPlayer } from '../database/queries';
-import { rarityLabel, rarityStars } from '../utils/helpers';
+import { rarityLabel } from '../utils/helpers';
 import { config } from '../config';
 import { Rarity } from '../data/players';
 
@@ -29,7 +29,7 @@ function buildCollectionEmbed(
   const desc = slice.map((c, i) => {
     const rarity = (c.rarity ?? 'common') as Rarity;
     return (
-      `**${start + i + 1}.** ${rarityStars(rarity)} **${c.name ?? c.player_id}** — ${c.game ?? '?'}\n` +
+      `**${start + i + 1}.** **${c.name ?? c.player_id}** — ${c.game ?? '?'}\n` +
       `└ ${c.team ?? 'Free Agent'} · ${rarityLabel(rarity)} · <t:${Math.floor(Number(c.claimed_at) / 1000)}:d>`
     );
   }).join('\n\n');

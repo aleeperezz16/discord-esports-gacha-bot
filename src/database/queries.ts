@@ -11,6 +11,7 @@ export interface DbPlayer {
   nationality:    string;
   rarity:         Rarity;
   earnings:       number;
+  image_url:      string;
   last_synced_at: number;
 }
 
@@ -38,7 +39,7 @@ export interface GuildPlayer {
 export const playerRepository = {
   async getAvailablePlayers(guildId: string): Promise<Player[]> {
     const { rows } = await pool.query<Player>(`
-      SELECT id, name, team, game, role, nationality, rarity
+      SELECT id, name, team, game, role, nationality, rarity, image_url
       FROM players
       WHERE id NOT IN (
         SELECT player_id FROM player_claims WHERE guild_id = $1
@@ -49,8 +50,8 @@ export const playerRepository = {
 
   async upsertPlayer(p: DbPlayer): Promise<void> {
     await pool.query(`
-      INSERT INTO players (id, name, team, game, role, nationality, rarity, earnings, last_synced_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO players (id, name, team, game, role, nationality, rarity, earnings, image_url, last_synced_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       ON CONFLICT (id) DO UPDATE SET
         name           = EXCLUDED.name,
         team           = EXCLUDED.team,
@@ -59,8 +60,9 @@ export const playerRepository = {
         nationality    = EXCLUDED.nationality,
         rarity         = EXCLUDED.rarity,
         earnings       = EXCLUDED.earnings,
+        image_url      = EXCLUDED.image_url,
         last_synced_at = EXCLUDED.last_synced_at
-    `, [p.id, p.name, p.team, p.game, p.role, p.nationality, p.rarity, p.earnings, p.last_synced_at]);
+    `, [p.id, p.name, p.team, p.game, p.role, p.nationality, p.rarity, p.earnings, p.image_url, p.last_synced_at]);
   },
 
   async countPlayers(): Promise<number> {
@@ -159,5 +161,47 @@ export const claimRepository = {
       [guildId],
     );
     return rows.map(r => ({ user_id: r.user_id, count: parseInt(r.count, 10) }));
+  },
+};
+
+export const adminRepository = {
+  async getStats(guildId: string): Promise<{ players: number; withImages: number; claims: number; rolls: number }> {
+    const [p, img, c, r] = await Promise.all([
+      pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM players'),
+      pool.query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM players WHERE image_url IS NOT NULL AND image_url != ''`),
+      pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM player_claims WHERE guild_id = $1', [guildId]),
+      pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM roll_history WHERE guild_id = $1', [guildId]),
+    ]);
+    return {
+      players:    parseInt(p.rows[0].count,   10),
+      withImages: parseInt(img.rows[0].count, 10),
+      claims:     parseInt(c.rows[0].count,   10),
+      rolls:      parseInt(r.rows[0].count,   10),
+    };
+  },
+
+  async getSampleImages(limit = 3): Promise<{ name: string; image_url: string }[]> {
+    const { rows } = await pool.query<{ name: string; image_url: string }>(
+      `SELECT name, image_url FROM players WHERE image_url IS NOT NULL AND image_url != '' LIMIT $1`,
+      [limit],
+    );
+    return rows;
+  },
+
+  async resetClaims(guildId: string): Promise<number> {
+    const { rowCount } = await pool.query('DELETE FROM player_claims WHERE guild_id = $1', [guildId]);
+    return rowCount ?? 0;
+  },
+
+  async resetRolls(guildId: string): Promise<number> {
+    const { rowCount } = await pool.query('DELETE FROM roll_history WHERE guild_id = $1', [guildId]);
+    return rowCount ?? 0;
+  },
+
+  async resetPlayers(): Promise<number> {
+    await pool.query('DELETE FROM player_claims');
+    await pool.query('DELETE FROM roll_history');
+    const { rowCount } = await pool.query('DELETE FROM players');
+    return rowCount ?? 0;
   },
 };

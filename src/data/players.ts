@@ -1,13 +1,14 @@
 export type Rarity = 'legendary' | 'epic' | 'rare' | 'common';
 
 export interface Player {
-  id: string;
-  name: string;
-  team: string;
-  game: string;
-  role: string;
-  rarity: Rarity;
+  id:          string;
+  name:        string;
+  team:        string;
+  game:        string;
+  role:        string;
+  rarity:      Rarity;
   nationality: string;
+  image_url?:  string;
 }
 
 export const players: Player[] = [
