@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.db
+
+# Claude
+.claude/
+CLAUDE.md
