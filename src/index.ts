@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createBot } from './bot';
 import { initDb } from './database/pool';
-import { syncFromLiquipedia, scheduleDailySync } from './services/sync';
+import { syncPlayers, scheduleDailySync } from './services/sync';
 
 async function main(): Promise<void> {
   const token = process.env.DISCORD_TOKEN;
@@ -10,7 +10,7 @@ async function main(): Promise<void> {
   await initDb();
   console.log('✅ Base de datos inicializada');
 
-  await syncFromLiquipedia();
+  await syncPlayers();
   scheduleDailySync();
 
   const client = createBot();

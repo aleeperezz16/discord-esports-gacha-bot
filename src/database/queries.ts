@@ -25,6 +25,16 @@ export interface ClaimedPlayer {
   rarity:      Rarity | null;
 }
 
+export interface GuildPlayer {
+  id:         string;
+  name:       string;
+  team:       string;
+  game:       string;
+  role:       string;
+  rarity:     Rarity;
+  claimed_by: string | null;
+}
+
 export const playerRepository = {
   async getAvailablePlayers(guildId: string): Promise<Player[]> {
     const { rows } = await pool.query<Player>(`
@@ -56,6 +66,20 @@ export const playerRepository = {
   async countPlayers(): Promise<number> {
     const { rows } = await pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM players');
     return parseInt(rows[0].count, 10);
+  },
+
+  async getGuildPlayerList(guildId: string, game: string | null): Promise<GuildPlayer[]> {
+    const { rows } = await pool.query<GuildPlayer>(`
+      SELECT p.id, p.name, p.team, p.game, p.role, p.rarity,
+             pc.user_id AS claimed_by
+      FROM players p
+      LEFT JOIN player_claims pc ON pc.player_id = p.id AND pc.guild_id = $1
+      WHERE ($2::text IS NULL OR p.game = $2)
+      ORDER BY
+        CASE p.rarity WHEN 'legendary' THEN 1 WHEN 'epic' THEN 2 WHEN 'rare' THEN 3 ELSE 4 END,
+        p.name ASC
+    `, [guildId, game]);
+    return rows;
   },
 };
 

@@ -4,6 +4,7 @@ import * as roll       from './commands/roll';
 import * as collection from './commands/collection';
 import * as ranking    from './commands/ranking';
 import * as configurar from './commands/configurar';
+import * as lista      from './commands/lista';
 
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
@@ -14,7 +15,7 @@ if (!token || !clientId) {
   process.exit(1);
 }
 
-const commands = [roll.data, collection.data, ranking.data, configurar.data].map(c => c.toJSON());
+const commands = [roll.data, collection.data, ranking.data, configurar.data, lista.data].map(c => c.toJSON());
 const rest     = new REST().setToken(token);
 
 (async () => {

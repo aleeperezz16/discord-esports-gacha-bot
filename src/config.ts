@@ -70,8 +70,9 @@ export const config = {
   // Cambiar el nombre requiere volver a ejecutar `yarn deploy`.
 
   commands: {
-    roll:       { name: 'roll',     description: '¡Tira para obtener un jugador de Esports aleatorio!' },
+    roll:       { name: 'roll',      description: '¡Tira para obtener un jugador de Esports aleatorio!' },
     collection: { name: 'coleccion', description: 'Muestra tu colección de jugadores o la de otro usuario.' },
     ranking:    { name: 'ranking',   description: 'Muestra el ranking de coleccionistas del servidor.' },
+    lista:      { name: 'lista',     description: 'Lista todos los jugadores disponibles en el servidor.' },
   },
 };

@@ -4,6 +4,7 @@ import * as roll       from './commands/roll';
 import * as collection from './commands/collection';
 import * as ranking    from './commands/ranking';
 import * as configurar from './commands/configurar';
+import * as lista      from './commands/lista';
 import { guildConfigRepository } from './database/guildConfig';
 import { config } from './config';
 
@@ -12,12 +13,14 @@ const COMMANDS: Command[] = [
   { data: collection.data, execute: collection.execute },
   { data: ranking.data,    execute: ranking.execute },
   { data: configurar.data, execute: configurar.execute },
+  { data: lista.data,      execute: lista.execute },
 ];
 
 const PREFIX_COMMANDS: Record<string, (msg: Parameters<typeof roll.executeFromMessage>[0]) => Promise<void>> = {
   [config.commands.roll.name]:       roll.executeFromMessage,
   [config.commands.collection.name]: collection.executeFromMessage,
   [config.commands.ranking.name]:    ranking.executeFromMessage,
+  [config.commands.lista.name]:      lista.executeFromMessage,
 };
 
 export function createBot(): ExtendedClient {
